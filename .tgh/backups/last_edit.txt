@@ -9,3 +9,5 @@
 /root/Zee5-Downloader-1/docker-compose.yml|/root/Zee5-Downloader-1/.tgh/backups/20261106_152019_573720_docker-compose.yml
 /root/Zee5-Downloader-1/requirements.txt|/root/Zee5-Downloader-1/.tgh/backups/20261106_152023_593424_requirements.txt
 /root/Zee5-Downloader-1/plugins/rip.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_152748_018240_rip.py
+/root/Zee5-Downloader-1/plugins/rip.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_154719_548759_rip.py
+/root/Zee5-Downloader-1/plugins/rip.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_154723_258285_rip.py
