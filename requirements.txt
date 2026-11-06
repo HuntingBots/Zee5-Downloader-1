@@ -11,3 +11,4 @@ Pillow
 psutil
 pytest
 beautifulsoup4
+yt-dlp
