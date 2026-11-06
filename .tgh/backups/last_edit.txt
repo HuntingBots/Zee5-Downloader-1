@@ -16,3 +16,6 @@
 /root/Zee5-Downloader-1/config.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_160337_743493_config.py
 /root/Zee5-Downloader-1/plugins/rip.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_160344_803218_rip.py
 /root/Zee5-Downloader-1/plugins/rip.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_160347_153527_rip.py
+/root/Zee5-Downloader-1/config.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_161726_768516_config.py
+/root/Zee5-Downloader-1/bot.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_163154_729272_bot.py
+/root/Zee5-Downloader-1/bot.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_163202_768157_bot.py

@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from pyrogram import Client
 from config import Config
 
@@ -28,5 +29,10 @@ class TGHBot(Client):
         await super().stop()
         logger.info("Bot stopped.")
 
+async def main():
+    bot = TGHBot()
+    await bot.start()
+    await asyncio.Event().wait()
+
 if __name__ == "__main__":
-    TGHBot().run()
+    asyncio.run(main())
