@@ -8,26 +8,31 @@ START_TEXT = """
 
 Welcome to **TGH Universal OTT Downloader** 🎬.
 
-I can help you extract and download media streams from supported OTT platforms.
+I can help you search, extract and download media streams from NetMirror and supported platforms.
 
-Use `/help` to see available commands and usage guide.
+**Quick Commands:**
+• `/search <name>` - Search movies & web series on NetMirror
+• `/rip <link>` - Download from direct media links
+
+Use `/help` for detailed usage guide.
 """
 
 HELP_TEXT = """
 📖 **How to Use:**
 
-1. Send `/rip <content_link>` to analyze media.
-2. Choose your preferred quality/resolution from the inline buttons.
-3. The bot will process and deliver the media.
+🔍 **1. Search & Download:**
+• Type `/search <movie or series name>`
+• Example: `/search Mirzapur` or `/search Panchayat`
+• Click on any search result, choose your season/episode and resolution to download directly!
 
-**Supported Platforms:**
-• Net79 (`net79.cc`)
-• More coming soon!
+🔗 **2. Link Download:**
+• Send `/rip <link>` (or simply paste any direct `.m3u8` / `.mp4` video link).
+• Choose quality to download.
 
 **Commands:**
-• `/start` - Start the bot
+• `/search <name>` - Search movies & series
+• `/rip <link>` - Analyze & download media link
 • `/help` - Show this help message
-• `/rip <link>` - Analyze & download media
 • `/about` - About this bot
 • `/ping` - Check bot latency
 """
@@ -36,9 +41,9 @@ ABOUT_TEXT = """
 🤖 **About This Bot**
 
 • **Name:** TGH Universal OTT Downloader
-• **Framework:** Pyrogram
+• **Engine:** NetMirror / Net79 + FFmpeg + yt-dlp
 • **Database:** MongoDB
-• **Engine:** FFmpeg / FFprobe
+• **Framework:** Pyrogram
 """
 
 def get_start_buttons():

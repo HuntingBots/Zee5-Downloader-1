@@ -25,5 +25,13 @@ class TestProviders(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_net79_search(self):
+        async def run_test():
+            results = await self.net79.search("Panchayat")
+            self.assertTrue(len(results) > 0)
+            self.assertEqual(results[0]["title"], "Panchayat")
+
+        asyncio.run(run_test())
+
 if __name__ == "__main__":
     unittest.main()
