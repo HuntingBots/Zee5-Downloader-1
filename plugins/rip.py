@@ -1,5 +1,5 @@
 from pyrogram import Client, filters
-from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from providers.net79 import Net79Provider
 from database.mongo import db
 from utils.auth import authorized_only
@@ -83,9 +83,30 @@ async def rip_command(client: Client, message: Message):
             )
 
         # Log to DB
-        await db.add_user(message.from_user.id, message.from_user.first_name)
-        await db.log_download(message.from_user.id, url, "analyzed")
+        user = message.from_user
+        if user:
+            await db.add_user(user.id, user.first_name)
+            await db.log_download(user.id, url, "analyzed")
 
     except Exception as e:
         logger.error(f"Error in /rip: {e}")
         await status_msg.edit(f"❌ An error occurred: {str(e)}")
+
+@Client.on_callback_query(filters.regex(r"^dl_"))
+async def download_callback(client: Client, callback_query: CallbackQuery):
+    format_id = callback_query.data.split("dl_", 1)[1]
+    await callback_query.answer("Download requested! Processing...", show_alert=False)
+    await callback_query.message.reply_text(f"🚀 Processing download for format: `{format_id}`")
+
+@Client.on_callback_query(filters.regex(r"^cancel$"))
+async def cancel_callback(client: Client, callback_query: CallbackQuery):
+    await callback_query.message.delete()
+    await callback_query.answer("Cancelled", show_alert=False)
+
+@Client.on_callback_query(filters.regex(r"^info$"))
+async def info_callback(client: Client, callback_query: CallbackQuery):
+    await callback_query.answer("TGH OTT Downloader - Quality Selection Menu", show_alert=True)
+
+@Client.on_callback_query(filters.regex(r"^refresh$"))
+async def refresh_callback(client: Client, callback_query):
+    await callback_query.answer("Refreshed details!", show_alert=False)

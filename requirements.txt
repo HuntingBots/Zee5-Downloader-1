@@ -10,3 +10,4 @@ hachoir
 Pillow
 psutil
 pytest
+beautifulsoup4

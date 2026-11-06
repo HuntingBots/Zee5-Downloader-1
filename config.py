@@ -14,4 +14,5 @@ class Config:
         -1003346392301,
         -1003943851323
     ]
+    ALLOWED_GROUPS = ALLOWED_GROUP_IDS
     ALLOWED_USERS = [int(x) for x in os.environ.get("ALLOWED_USERS", "").split(",") if x]

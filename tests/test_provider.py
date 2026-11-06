@@ -1,24 +1,15 @@
 import unittest
 import asyncio
-from providers.generic import GenericProvider
+from providers.net79 import Net79Provider
 
-class TestGenericProvider(unittest.TestCase):
+class TestNet79Provider(unittest.TestCase):
     def setUp(self):
-        self.provider = GenericProvider()
+        self.provider = Net79Provider()
 
     def test_can_handle(self):
         async def run_test():
-            self.assertTrue(await self.provider.can_handle("http://example.com/video.mp4"))
-            self.assertTrue(await self.provider.can_handle("http://example.com/stream.m3u8"))
-            self.assertFalse(await self.provider.can_handle("http://example.com/page.html"))
-
-        asyncio.run(run_test())
-
-    def test_get_metadata(self):
-        async def run_test():
-            meta = await self.provider.get_metadata("http://example.com/video.mp4")
-            self.assertEqual(meta["title"], "video.mp4")
-            self.assertEqual(meta["provider"], "Generic")
+            self.assertTrue(await self.provider.can_handle("https://net79.cc/video/123"))
+            self.assertFalse(await self.provider.can_handle("https://example.com/video"))
 
         asyncio.run(run_test())
 
