@@ -1,6 +1,5 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from providers.generic import GenericProvider
 from providers.net79 import Net79Provider
 from database.mongo import db
 import logging
@@ -9,8 +8,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize providers
 PROVIDERS = [
-    Net79Provider(),
-    GenericProvider()
+    Net79Provider()
 ]
 
 @Client.on_message(filters.command("rip") & filters.private)
