@@ -13,6 +13,7 @@ from providers.ott_drm import OTTDRMProvider
 from providers.zee5 import Zee5Provider
 from database.mongo import db
 from utils.auth import authorized_only
+from utils.progress import human_bytes, render_progress_bar
 from core.metadata import get_media_info
 
 logger = logging.getLogger(__name__)
@@ -30,17 +31,6 @@ DOWNLOAD_CACHE = {}
 
 def clean_url_string(text: str) -> str:
     return text.strip().strip("<>\"' ")
-
-def human_bytes(size: int) -> str:
-    if not size:
-        return "0 B"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    i = 0
-    size_f = float(size)
-    while size_f >= 1024.0 and i < len(units) - 1:
-        size_f /= 1024.0
-        i += 1
-    return f"{size_f:.2f} {units[i]}"
 
 async def generate_thumbnail(video_path: str, thumb_path: str) -> str:
     try:
@@ -225,12 +215,13 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
         return
 
     await callback_query.answer("Starting download process...", show_alert=False)
-    
+
     title = data.get("title", "Video")
     url = data["url"]
     chat_id = callback_query.message.chat.id
     user_id = callback_query.from_user.id if callback_query.from_user else chat_id
 
+    header_text = f"🎬 **{title}**\n⚙️ Quality: `{format_id}`"
     status_msg = await callback_query.message.reply_text(
         f"⏳ **Starting download...**\n"
         f"📌 **Title:** `{title}`\n"
@@ -249,7 +240,7 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
         "outtmpl": out_template,
         "quiet": True,
         "no_warnings": True,
-        "max_filesize": 2000 * 1024 * 1024, # 2 GB Telegram Limit
+        "max_filesize": 2000 * 1024 * 1024,
     }
     if format_id not in ["direct", "default", "best"]:
         ydl_opts["format"] = f"{format_id}+bestaudio/best"
@@ -257,7 +248,31 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
         ydl_opts["format"] = "best"
 
     try:
-        await status_msg.edit_text(f"⬇️ **Downloading:** `{title}`\n⏳ Fetching stream fragments...")
+        start_dl_time = time.time()
+        last_dl_edit = [0]
+
+        # yt-dlp progress hook
+        def ytdl_hook(d):
+            if d.get("status") == "downloading":
+                now = time.time()
+                if now - last_dl_edit[0] >= 3.5:
+                    last_dl_edit[0] = now
+                    current = d.get("downloaded_bytes", 0)
+                    total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                    speed = d.get("speed") or 0
+                    eta = d.get("eta") or 0
+                    progress_text = render_progress_bar(
+                        current=current,
+                        total=total,
+                        speed=speed,
+                        eta=eta,
+                        engine="FFMPEG",
+                        mode="DOWNLOAD",
+                        header=header_text
+                    )
+                    asyncio.run_coroutine_threadsafe(status_msg.edit_text(progress_text), loop)
+
+        ydl_opts["progress_hooks"] = [ytdl_hook]
 
         def _do_download():
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -284,10 +299,6 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
             )
             return
 
-        await status_msg.edit_text(
-            f"⬆️ **Uploading to Telegram:** `{human_bytes(file_size)}`\n⏳ Please wait..."
-        )
-
         # Generate thumbnail
         thumb_path = os.path.join(work_dir, "thumb.jpg")
         thumb = await generate_thumbnail(file_path, thumb_path)
@@ -306,17 +317,27 @@ async def download_callback(client: Client, callback_query: CallbackQuery):
             f"🤖 *Downloaded via TGH OTT Downloader*"
         )
 
+        start_up_time = time.time()
         last_edit = [0]
         async def upload_progress(current, total):
             now = time.time()
-            if now - last_edit[0] >= 3.5:
+            if now - last_edit[0] >= 3.5 or current == total:
                 last_edit[0] = now
-                pct = round((current / total) * 100)
+                elapsed = now - start_up_time
+                speed = current / elapsed if elapsed > 0 else 0
+                remaining = total - current if total > current else 0
+                eta = remaining / speed if speed > 0 else 0
+                progress_text = render_progress_bar(
+                    current=current,
+                    total=total,
+                    speed=speed,
+                    eta=eta,
+                    engine="Pyrogram",
+                    mode="UPLOAD",
+                    header=header_text
+                )
                 try:
-                    await status_msg.edit_text(
-                        f"⬆️ **Uploading:** `{pct}%`\n"
-                        f"📦 `{human_bytes(current)}` / `{human_bytes(total)}`"
-                    )
+                    await status_msg.edit_text(progress_text)
                 except Exception:
                     pass
 

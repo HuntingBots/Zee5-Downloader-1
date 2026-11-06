@@ -9,6 +9,7 @@ from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, 
 from providers.net79 import Net79Provider
 from database.mongo import db
 from utils.auth import authorized_only
+from utils.progress import human_bytes, render_progress_bar
 from core.metadata import get_media_info
 
 logger = logging.getLogger(__name__)
@@ -17,17 +18,6 @@ net79_client = Net79Provider()
 
 # Search session storage
 SEARCH_SESSIONS = {}
-
-def human_bytes(size: int) -> str:
-    if not size:
-        return "0 B"
-    units = ["B", "KB", "MB", "GB", "TB"]
-    i = 0
-    size_f = float(size)
-    while size_f >= 1024.0 and i < len(units) - 1:
-        size_f /= 1024.0
-        i += 1
-    return f"{size_f:.2f} {units[i]}"
 
 async def generate_thumbnail(video_path: str, thumb_path: str) -> str:
     try:
@@ -210,7 +200,7 @@ async def handle_pick_title(client: Client, callback_query: CallbackQuery):
         for s in seasons:
             s_num = s.get("season_number", 1)
             if s_num == 0:
-                continue # Skip specials
+                continue
             row.append(InlineKeyboardButton(f"Season {s_num}", callback_data=f"n79_se_{session_id}_{s_num}"))
             if len(row) == 2:
                 buttons.append(row)
@@ -236,7 +226,6 @@ async def handle_pick_season(client: Client, callback_query: CallbackQuery):
     session["cur_se"] = season_num
     item = session["selected_item"]
     title = item.get("title", "Show")
-    tmdb_id = item.get("tmdbId")
 
     await callback_query.answer(f"Loading Season {season_num} episodes...", show_alert=False)
 
@@ -247,8 +236,13 @@ async def handle_pick_season(client: Client, callback_query: CallbackQuery):
             ep_count = s.get("episode_count", 10)
             break
 
-    # Build episode buttons in rows of 5
-    buttons = []
+    session["ep_count"] = ep_count
+
+    # Build buttons: Download All at top, then individual episodes
+    buttons = [
+        [InlineKeyboardButton(f"📥 Download All Episodes (S{season_num} · {ep_count} EPs)", callback_data=f"n79_all_{session_id}_{season_num}")]
+    ]
+
     row = []
     for ep in range(1, ep_count + 1):
         row.append(InlineKeyboardButton(f"EP {ep}", callback_data=f"n79_ep_{session_id}_{season_num}_{ep}"))
@@ -261,10 +255,235 @@ async def handle_pick_season(client: Client, callback_query: CallbackQuery):
     buttons.append([InlineKeyboardButton("⬅️ Back to Seasons", callback_data=f"n79_pk_{session_id}_0")])
 
     text = (
-        f"📺 **{title}** — Season {season_num}\n\n"
-        f"Select an episode to download:"
+        f"📺 **{title}** — Season {season_num}\n"
+        f"Total Episodes: `{ep_count}`\n\n"
+        f"Choose an option below:\n"
+        f"• Download entire season at once with **Download All Episodes**\n"
+        f"• Or download individual episodes one by one:"
     )
     await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
+
+@Client.on_callback_query(filters.regex(r"^n79_all_"))
+async def handle_all_episodes_menu(client: Client, callback_query: CallbackQuery):
+    """Quality selection for batch download of all episodes in a season."""
+    parts = callback_query.data.split("_")
+    session_id = parts[2]
+    season_num = int(parts[3])
+
+    session = SEARCH_SESSIONS.get(session_id)
+    if not session or not session.get("selected_item"):
+        await callback_query.answer("⚠️ Session expired.", show_alert=True)
+        return
+
+    item = session["selected_item"]
+    title = item.get("title", "Show")
+    ep_count = session.get("ep_count", 10)
+
+    text = (
+        f"📥 **Download All Episodes**\n\n"
+        f"📺 **{title}** — Season {season_num}\n"
+        f"📦 Total Episodes to download: `{ep_count}`\n\n"
+        f"Select preferred quality for the entire season:"
+    )
+
+    buttons = [
+        [InlineKeyboardButton("▶️ 720p (Recommended)", callback_data=f"n79_alldl_{session_id}_{season_num}_720")],
+        [InlineKeyboardButton("▶️ 480p (Data Saver)", callback_data=f"n79_alldl_{session_id}_{season_num}_480")],
+        [InlineKeyboardButton("▶️ 360p (Fastest)", callback_data=f"n79_alldl_{session_id}_{season_num}_360")],
+        [InlineKeyboardButton("▶️ 1080p (Full HD)", callback_data=f"n79_alldl_{session_id}_{season_num}_1080")],
+        [InlineKeyboardButton("⬅️ Back to Episodes", callback_data=f"n79_se_{session_id}_{season_num}")]
+    ]
+
+    await callback_query.message.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+    await callback_query.answer()
+
+
+@Client.on_callback_query(filters.regex(r"^n79_alldl_"))
+async def handle_batch_download_season(client: Client, callback_query: CallbackQuery):
+    """Execute sequential batch download and upload for all episodes in a season."""
+    parts = callback_query.data.split("_")
+    session_id = parts[2]
+    season_num = int(parts[3])
+    target_res = int(parts[4])
+
+    session = SEARCH_SESSIONS.get(session_id)
+    if not session or not session.get("selected_item"):
+        await callback_query.answer("⚠️ Session expired.", show_alert=True)
+        return
+
+    item = session["selected_item"]
+    title = item.get("title", "Show")
+    subject_id = item.get("subjectId")
+    detail_path = item.get("detailPath", "")
+    ep_count = session.get("ep_count", 10)
+
+    await callback_query.answer("Starting batch download...", show_alert=False)
+
+    chat_id = callback_query.message.chat.id
+    user_id = callback_query.from_user.id if callback_query.from_user else chat_id
+
+    batch_msg = await callback_query.message.reply_text(
+        f"🚀 **Batch Download Initialized**\n\n"
+        f"📺 **{title}** — Season {season_num}\n"
+        f"📦 Total Episodes: `{ep_count}` | Quality: `{target_res}p`\n\n"
+        f"Processing Episode 1 of {ep_count}..."
+    )
+
+    work_dir = f"/tmp/tgh_downloads/{user_id}_{session_id}_batch"
+    os.makedirs(work_dir, exist_ok=True)
+
+    successful = 0
+
+    for ep in range(1, ep_count + 1):
+        full_ep_title = f"{title} S{season_num:02d}E{ep:02d}"
+        header_text = f"📺 **{title} — Season {season_num}** ({ep}/{ep_count})\n📌 Episode {ep}"
+
+        try:
+            await batch_msg.edit_text(f"⏳ Fetching stream for **{full_ep_title}** ({ep}/{ep_count})...")
+
+            dl_info = await net79_client.get_download_info(
+                subject_id=subject_id,
+                detail_path=detail_path,
+                season=season_num,
+                episode=ep,
+                media_type=2
+            )
+
+            qualities = dl_info.get("qualities", [])
+            if not qualities:
+                await callback_query.message.reply_text(f"⚠️ Episode {ep} stream not available on server, skipping...")
+                continue
+
+            # Pick matching or closest quality
+            chosen_q = None
+            for q in qualities:
+                if q.get("res") == target_res:
+                    chosen_q = q
+                    break
+            if not chosen_q:
+                chosen_q = qualities[0] # Fallback to first available
+
+            stream_url = chosen_q.get("url") or chosen_q.get("raw")
+            actual_res = chosen_q.get("res", target_res)
+            dest_file = os.path.join(work_dir, f"{full_ep_title}_{actual_res}p.mp4")
+
+            # Download with custom progress bar
+            last_dl_edit = [0]
+            async def dl_progress(current, total, speed, eta):
+                now = time.time()
+                if now - last_dl_edit[0] >= 3.5 or current == total:
+                    last_dl_edit[0] = now
+                    progress_text = render_progress_bar(
+                        current=current,
+                        total=total,
+                        speed=speed,
+                        eta=eta,
+                        engine="FFMPEG",
+                        mode="DOWNLOAD",
+                        header=header_text
+                    )
+                    try:
+                        await batch_msg.edit_text(progress_text)
+                    except Exception:
+                        pass
+
+            success = await net79_client.download_file(stream_url, dest_file, progress_callback=dl_progress)
+            if not success or not os.path.exists(dest_file):
+                await callback_query.message.reply_text(f"❌ Failed to download {full_ep_title}, skipping...")
+                continue
+
+            file_size = os.path.getsize(dest_file)
+            thumb_path = os.path.join(work_dir, f"thumb_{ep}.jpg")
+            thumb = await generate_thumbnail(dest_file, thumb_path)
+
+            media_info = await get_media_info(dest_file)
+            duration = int(media_info.get("duration", 0))
+            r_parts = str(media_info.get("resolution", "0x0")).split("x")
+            width = int(r_parts[0]) if len(r_parts) == 2 and r_parts[0].isdigit() else 0
+            height = int(r_parts[1]) if len(r_parts) == 2 and r_parts[1].isdigit() else 0
+
+            caption = (
+                f"🎬 **{full_ep_title}**\n\n"
+                f"✨ Quality: `{actual_res}p`\n"
+                f"⚖️ Size: `{human_bytes(file_size)}`\n"
+                f"⏱️ Duration: `{duration}s`\n\n"
+                f"🤖 *Downloaded via NetMirror / Net79*"
+            )
+
+            # Upload with custom progress bar
+            start_up_time = time.time()
+            last_up_edit = [0]
+            async def up_progress(current, total):
+                now = time.time()
+                if now - last_up_edit[0] >= 3.5 or current == total:
+                    last_up_edit[0] = now
+                    elapsed = now - start_up_time
+                    speed = current / elapsed if elapsed > 0 else 0
+                    remaining = total - current if total > current else 0
+                    eta = remaining / speed if speed > 0 else 0
+                    progress_text = render_progress_bar(
+                        current=current,
+                        total=total,
+                        speed=speed,
+                        eta=eta,
+                        engine="Pyrogram",
+                        mode="UPLOAD",
+                        header=header_text
+                    )
+                    try:
+                        await batch_msg.edit_text(progress_text)
+                    except Exception:
+                        pass
+
+            try:
+                await client.send_video(
+                    chat_id=chat_id,
+                    video=dest_file,
+                    caption=caption,
+                    duration=duration,
+                    width=width,
+                    height=height,
+                    thumb=thumb,
+                    supports_streaming=True,
+                    progress=up_progress
+                )
+            except Exception as ve:
+                logger.warning(f"send_video error for batch ep {ep}: {ve}, using send_document")
+                await client.send_document(
+                    chat_id=chat_id,
+                    document=dest_file,
+                    caption=caption,
+                    thumb=thumb,
+                    progress=up_progress
+                )
+
+            successful += 1
+
+            # Cleanup this episode file immediately
+            if os.path.exists(dest_file):
+                os.remove(dest_file)
+            if thumb and os.path.exists(thumb):
+                os.remove(thumb)
+
+            await asyncio.sleep(1.5)
+
+        except Exception as e:
+            logger.error(f"Error processing episode {ep}: {e}", exc_info=True)
+            await callback_query.message.reply_text(f"⚠️ Error downloading episode {ep}: `{str(e)}`")
+
+    shutil.rmtree(work_dir, ignore_errors=True)
+
+    try:
+        await batch_msg.delete()
+    except Exception:
+        pass
+
+    await callback_query.message.reply_text(
+        f"🎉 **Batch Download Completed!**\n\n"
+        f"📺 **{title} — Season {season_num}**\n"
+        f"✅ Successfully uploaded `{successful}` of `{ep_count}` episodes to Telegram."
+    )
 
 
 @Client.on_callback_query(filters.regex(r"^n79_ep_"))
@@ -321,6 +540,7 @@ async def handle_pick_episode(client: Client, callback_query: CallbackQuery):
 
 @Client.on_callback_query(filters.regex(r"^n79_dl_"))
 async def handle_download_selected(client: Client, callback_query: CallbackQuery):
+    """Download single movie or single series episode with new progress bar."""
     parts = callback_query.data.split("_")
     session_id = parts[2]
     q_idx = int(parts[3])
@@ -349,6 +569,7 @@ async def handle_download_selected(client: Client, callback_query: CallbackQuery
     chat_id = callback_query.message.chat.id
     user_id = callback_query.from_user.id if callback_query.from_user else chat_id
 
+    header_text = f"🎬 **{full_title}**\n⚙️ Quality: `{res}p`"
     status_msg = await callback_query.message.reply_text(
         f"⏳ **Starting download...**\n"
         f"📌 `{full_title}`\n"
@@ -361,19 +582,23 @@ async def handle_download_selected(client: Client, callback_query: CallbackQuery
     safe_name = "".join(c for c in full_title if c.isalnum() or c in (" ", "_", "-")).strip()
     dest_path = os.path.join(work_dir, f"{safe_name}_{res}p.mp4")
 
-    # Progress reporting for download
+    # Download with custom progress bar
     last_dl_edit = [0]
-    async def dl_progress(current, total):
+    async def dl_progress(current, total, speed, eta):
         now = time.time()
         if now - last_dl_edit[0] >= 3.5 or current == total:
             last_dl_edit[0] = now
-            pct = round((current / total) * 100) if total else 0
+            progress_text = render_progress_bar(
+                current=current,
+                total=total,
+                speed=speed,
+                eta=eta,
+                engine="FFMPEG",
+                mode="DOWNLOAD",
+                header=header_text
+            )
             try:
-                await status_msg.edit_text(
-                    f"⬇️ **Downloading:** `{full_title}`\n"
-                    f"📊 Progress: `{pct}%`\n"
-                    f"📦 `{human_bytes(current)}` / `{human_bytes(total)}`"
-                )
+                await status_msg.edit_text(progress_text)
             except Exception:
                 pass
 
@@ -387,11 +612,6 @@ async def handle_download_selected(client: Client, callback_query: CallbackQuery
         if file_size > 2000 * 1024 * 1024:
             await status_msg.edit_text(f"❌ File size exceeds Telegram's 2GB limit ({human_bytes(file_size)}).")
             return
-
-        await status_msg.edit_text(
-            f"⬆️ **Uploading to Telegram:** `{human_bytes(file_size)}`\n"
-            f"⏳ Generating preview and metadata..."
-        )
 
         thumb_path = os.path.join(work_dir, "thumb.jpg")
         thumb = await generate_thumbnail(dest_path, thumb_path)
@@ -410,17 +630,27 @@ async def handle_download_selected(client: Client, callback_query: CallbackQuery
             f"🤖 *Downloaded via NetMirror / Net79*"
         )
 
+        start_up_time = time.time()
         last_up_edit = [0]
         async def up_progress(current, total):
             now = time.time()
-            if now - last_up_edit[0] >= 3.5:
+            if now - last_up_edit[0] >= 3.5 or current == total:
                 last_up_edit[0] = now
-                pct = round((current / total) * 100) if total else 0
+                elapsed = now - start_up_time
+                speed = current / elapsed if elapsed > 0 else 0
+                remaining = total - current if total > current else 0
+                eta = remaining / speed if speed > 0 else 0
+                progress_text = render_progress_bar(
+                    current=current,
+                    total=total,
+                    speed=speed,
+                    eta=eta,
+                    engine="Pyrogram",
+                    mode="UPLOAD",
+                    header=header_text
+                )
                 try:
-                    await status_msg.edit_text(
-                        f"⬆️ **Uploading:** `{pct}%`\n"
-                        f"📦 `{human_bytes(current)}` / `{human_bytes(total)}`"
-                    )
+                    await status_msg.edit_text(progress_text)
                 except Exception:
                     pass
 

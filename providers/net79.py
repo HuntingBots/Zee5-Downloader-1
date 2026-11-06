@@ -88,7 +88,7 @@ class Net79Provider(BaseProvider):
         self,
         proxy_path_or_url: str,
         dest_path: str,
-        progress_callback: Optional[Callable[[int, int], Any]] = None
+        progress_callback: Optional[Callable[[int, int, float, float], Any]] = None
     ) -> bool:
         """Download file via Net79 proxy with Range headers and live progress."""
         if proxy_path_or_url.startswith("http"):
@@ -110,7 +110,13 @@ class Net79Provider(BaseProvider):
                         return False
 
                     total_size = int(resp.headers.get("Content-Length", 0))
+                    if "Content-Range" in resp.headers:
+                        m = re.search(r"/(\d+)", resp.headers["Content-Range"])
+                        if m:
+                            total_size = int(m.group(1))
+
                     downloaded = 0
+                    start_time = time.time()
                     last_update = 0
 
                     with open(dest_path, "wb") as f:
@@ -123,8 +129,12 @@ class Net79Provider(BaseProvider):
                             now = time.time()
                             if progress_callback and (now - last_update >= 3.0 or downloaded == total_size):
                                 last_update = now
+                                elapsed = now - start_time
+                                speed = downloaded / elapsed if elapsed > 0 else 0
+                                remaining = total_size - downloaded if total_size > downloaded else 0
+                                eta = remaining / speed if speed > 0 else 0
                                 try:
-                                    res = progress_callback(downloaded, total_size)
+                                    res = progress_callback(downloaded, total_size, speed, eta)
                                     if asyncio.iscoroutine(res):
                                         await res
                                 except Exception:
