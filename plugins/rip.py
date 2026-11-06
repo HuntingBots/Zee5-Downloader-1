@@ -2,6 +2,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from providers.net79 import Net79Provider
 from database.mongo import db
+from utils.auth import authorized_only
 import logging
 
 logger = logging.getLogger(__name__)
@@ -11,7 +12,7 @@ PROVIDERS = [
     Net79Provider()
 ]
 
-@Client.on_message(filters.command("rip") & filters.private)
+@Client.on_message(filters.command("rip") & authorized_only())
 async def rip_command(client: Client, message: Message):
     if len(message.command) < 2:
         await message.reply_text("Usage: `/rip <content_link>`")

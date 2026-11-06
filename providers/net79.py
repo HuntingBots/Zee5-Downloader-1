@@ -11,21 +11,40 @@ class Net79Provider(BaseProvider):
         return "net79.cc" in url
 
     async def get_metadata(self, url: str) -> Dict[str, Any]:
-        # Logic to fetch and parse metadata from net79.cc
-        # This is a placeholder for the actual scraping logic
-        return {
-            "title": "Sample Content from Net79",
-            "provider": "Net79",
-            "ext": "mp4",
-            "size": "Unknown"
-        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                # Example selectors - these will need adjustment based on actual site structure
+                title = soup.select_one('h1.title').text.strip() if soup.select_one('h1.title') else "Unknown Title"
+                poster = soup.select_one('img.poster')['src'] if soup.select_one('img.poster') else None
+                
+                return {
+                    "title": title,
+                    "poster": poster,
+                    "provider": "Net79",
+                    "ext": "mp4",
+                    "size": "Calculated after format selection"
+                }
 
     async def get_formats(self, url: str) -> List[Dict[str, Any]]:
-        # Logic to identify available formats
-        return [
-            {"format_id": "720p", "resolution": "720p", "note": "Standard Quality"},
-            {"format_id": "1080p", "resolution": "1080p", "note": "High Quality"}
-        ]
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as response:
+                html = await response.text()
+                soup = BeautifulSoup(html, 'html.parser')
+                
+                formats = []
+                # Example: Finding video sources in <source> tags or data attributes
+                sources = soup.select('video source')
+                for src in sources:
+                    res = src.get('size', 'Unknown')
+                    formats.append({
+                        "format_id": src.get('src'),
+                        "resolution": f"{res}p",
+                        "note": "Direct Stream"
+                    })
+                return formats if formats else [{"format_id": "default", "resolution": "720p", "note": "Default"}]
 
     async def get_download_url(self, format_id: str, metadata: Dict[str, Any]) -> str:
         # Logic to extract the authorized download URL
