@@ -1,56 +1,19 @@
-## Zee5 Downloader
-If you find any bugs, report at @TroJanzSupport
+# TGH Universal OTT Downloader
 
-**My Features**:
+A standalone, production-ready Telegram OTT media downloader bot.
 
-👉 Upload as file/video from any NON-DRM Zee5 link
+## Features
+- Modular provider architecture
+- Support for multiple OTT platforms
+- FFmpeg/FFprobe integration for media analysis
+- MongoDB for user and download tracking
+- Dockerized deployment
 
-👉 Permanent thumbnail support.
+## Setup
+1. Clone the repository.
+2. Copy `.env.example` to `.env` and fill in your credentials.
+3. Run with Docker: `docker-compose up --build`
 
-### Installation
-
-
-#### Deploy to Heroku
-
-[![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://www.heroku.com/deploy/)
-
-#### Run in your VPS
-
-* Install requirements
-
-```sh
-sudo apt install python3-pip
-sudo apt install ffmpeg
-```
-
-* Create config.py appropriately (Refer Configs section)
-
-* Run the app
-
-```sh
-git clone https://github.com/TroJanzHEX/Zee5-Downloader
-cd Zee5-Downloader
-pip3 install -r requirements.txt
-python3 bot.py
-```
-
-## Configs
-
-* TG_BOT_TOKEN  - Get bot token from @BotFather
-* APP_ID        - From my.telegram.org (or @UseTGXBot)
-* API_HASH      - From my.telegram.org (or @UseTGXBot)
-* DB_URI        - PostgreSQL DB URL
-
-## Commands
-
-* /start             - Check if bot is alive
-* /help              - To know how the bot works
-* /upgrade           - Nothing much here
-* /showthumb         - Shows saved thumbnail
-* /delthumb          - Clear saved thumbnail
-
-
-## Credits, and Thanks to Beloved Developers ;
-
-* [SpEcHlDe](https://telegram.dog/SpEcHlDe) 
-* [Dan Tès](https://telegram.dog/haskell)
+## Security
+- No DRM/Widevine bypass.
+- No unauthorized content access.

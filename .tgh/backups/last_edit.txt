@@ -1,0 +1,11 @@
+/root/Zee5-Downloader-1/requirements.txt|/root/Zee5-Downloader-1/.tgh/backups/20261106_151444_675075_requirements.txt
+/root/Zee5-Downloader-1/bot.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_151553_834555_bot.py
+/root/Zee5-Downloader-1/Dockerfile|/root/Zee5-Downloader-1/.tgh/backups/20261106_151610_139079_Dockerfile
+/root/Zee5-Downloader-1/README.md|/root/Zee5-Downloader-1/.tgh/backups/20261106_151627_617988_README.md
+/root/Zee5-Downloader-1/config.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_152005_442608_config.py
+/root/Zee5-Downloader-1/.env.example|/root/Zee5-Downloader-1/.tgh/backups/20261106_152007_273139_.env.example
+/root/Zee5-Downloader-1/README.md|/root/Zee5-Downloader-1/.tgh/backups/20261106_152011_474713_README.md
+/root/Zee5-Downloader-1/Dockerfile|/root/Zee5-Downloader-1/.tgh/backups/20261106_152015_763367_Dockerfile
+/root/Zee5-Downloader-1/docker-compose.yml|/root/Zee5-Downloader-1/.tgh/backups/20261106_152019_573720_docker-compose.yml
+/root/Zee5-Downloader-1/requirements.txt|/root/Zee5-Downloader-1/.tgh/backups/20261106_152023_593424_requirements.txt
+/root/Zee5-Downloader-1/plugins/rip.py|/root/Zee5-Downloader-1/.tgh/backups/20261106_152748_018240_rip.py

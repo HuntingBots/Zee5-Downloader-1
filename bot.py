@@ -1,32 +1,32 @@
 import logging
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+from pyrogram import Client
+from config import Config
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
 
-import os
+class TGHBot(Client):
+    def __init__(self):
+        super().__init__(
+            "tgh_downloader",
+            api_id=Config.API_ID,
+            api_hash=Config.API_HASH,
+            bot_token=Config.BOT_TOKEN,
+            plugins=dict(root="plugins")
+        )
 
-if bool(os.environ.get("WEBHOOK", False)):
-    from sample_config import Config
-else:
-    from config import Config
+    async def start(self):
+        await super().start()
+        me = await self.get_me()
+        logger.info(f"Bot started as @{me.username}")
 
-import pyrogram
+    async def stop(self, *args):
+        await super().stop()
+        logger.info("Bot stopped.")
 
-
-
-if __name__ == "__main__" :
-    if not os.path.isdir(Config.DOWNLOAD_LOCATION):
-        os.makedirs(Config.DOWNLOAD_LOCATION)
-    plugins = dict(
-        root="plugins"
-    )
-    app = pyrogram.Client(
-        "Zee5",
-        bot_token=Config.TG_BOT_TOKEN,
-        api_id=Config.APP_ID,
-        api_hash=Config.API_HASH,
-        plugins=plugins
-    )
-    Config.AUTH_USERS.add(680815375)
-    app.run()
+if __name__ == "__main__":
+    TGHBot().run()

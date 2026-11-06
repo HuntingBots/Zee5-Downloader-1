@@ -1,18 +1,14 @@
-FROM ubuntu:20.04
+FROM python:3.11-slim
 
+WORKDIR /app
 
-RUN mkdir ./app
-RUN chmod 777 ./app
-WORKDIR ./app
-
-RUN apt -qq update
-
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=Asia/Kolkata
-
-RUN apt -qq install -y git python3 ffmpeg python3-pip
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-CMD ["start.sh"]
+
+CMD ["python3", "bot.py"]

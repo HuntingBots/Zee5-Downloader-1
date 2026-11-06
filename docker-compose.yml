@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  bot:
+    build: .
+    environment:
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - MONGO_URI=${MONGO_URI}
+      - DB_NAME=${DB_NAME}
+    volumes:
+      - .:/app
+    restart: always
