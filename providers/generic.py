@@ -8,16 +8,16 @@ logger = logging.getLogger(__name__)
 
 class GenericProvider(BaseProvider):
     async def can_handle(self, url: str) -> bool:
-        u = url.strip().strip("<>").lower()
+        u = url.strip().strip("<>\"' ").lower()
         if not (u.startswith("http://") or u.startswith("https://")):
             return False
-        # If it's a known specialized platform, let their dedicated providers handle it
-        if "zee5.com" in u or "net79" in u or "netmirror" in u:
+        # If it's a known specialized platform, let dedicated providers handle it
+        if any(d in u for d in ["zee5.com", "sonyliv.com", "hotstar.com", "jiocinema.com", "netflix.com", "primevideo.com", "net79", "netmirror"]):
             return False
         return True
 
     async def get_metadata(self, url: str) -> Dict[str, Any]:
-        clean_url = url.strip().strip("<>")
+        clean_url = url.strip().strip("<>\"' ")
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
@@ -42,18 +42,29 @@ class GenericProvider(BaseProvider):
                 "url": clean_url
             }
         except Exception as e:
-            logger.warning(f"yt-dlp metadata fallback for {clean_url}: {e}")
+            logger.warning(f"yt-dlp metadata extraction failed for {clean_url}: {e}")
+            direct_exts = [".m3u8", ".mp4", ".mkv", ".webm", ".ts", ".avi", ".mov"]
+            if any(ext in clean_url.lower() for ext in direct_exts):
+                return {
+                    "title": clean_url.split("/")[-1].split("?")[0] or "Media Stream",
+                    "poster": None,
+                    "provider": "Direct Link",
+                    "ext": clean_url.split(".")[-1].split("?")[0] if "." in clean_url else "mp4",
+                    "size": "Direct Stream",
+                    "url": clean_url
+                }
             return {
                 "title": clean_url.split("/")[-1].split("?")[0] or "Media Stream",
                 "poster": None,
-                "provider": "Direct Link",
-                "ext": clean_url.split(".")[-1].split("?")[0] if "." in clean_url else "mp4",
-                "size": "Direct Stream",
+                "provider": "Web Link",
+                "ext": "mp4",
+                "size": "Unknown",
+                "error": str(e),
                 "url": clean_url
             }
 
     async def get_formats(self, url: str) -> List[Dict[str, Any]]:
-        clean_url = url.strip().strip("<>")
+        clean_url = url.strip().strip("<>\"' ")
         ydl_opts = {
             "quiet": True,
             "no_warnings": True,
@@ -84,7 +95,6 @@ class GenericProvider(BaseProvider):
                         "url": f.get("url")
                     })
 
-            # Sort by resolution descending if available
             formats.sort(key=lambda x: int(x["resolution"].replace("p", "")) if x["resolution"].replace("p", "").isdigit() else 0, reverse=True)
 
             if not formats:
@@ -96,13 +106,16 @@ class GenericProvider(BaseProvider):
                 })
             return formats
         except Exception as e:
-            logger.warning(f"yt-dlp format fallback for {clean_url}: {e}")
-            return [{
-                "format_id": "direct",
-                "resolution": "Direct",
-                "note": "Stream URL",
-                "url": clean_url
-            }]
+            logger.warning(f"yt-dlp format extraction failed for {clean_url}: {e}")
+            direct_exts = [".m3u8", ".mp4", ".mkv", ".webm", ".ts", ".avi", ".mov"]
+            if any(ext in clean_url.lower() for ext in direct_exts):
+                return [{
+                    "format_id": "direct",
+                    "resolution": "Direct",
+                    "note": "Stream URL",
+                    "url": clean_url
+                }]
+            return []
 
     async def get_download_url(self, format_id: str, metadata: Dict[str, Any]) -> str:
         return metadata.get("url", "")
